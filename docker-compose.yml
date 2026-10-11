@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgis:
+    image: postgis/postgis:15-3.3
+    container_name: sts-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: save_the_serve
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./supabase/migrations/20261012000000_init_sts_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql:ro
+      - ./supabase/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d save_the_serve"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - sts-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sts-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - sts-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sts-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgis:5432/save_the_serve
+      - DATABASE_URL_SYNC=postgresql+psycopg2://postgres:postgres@postgis:5432/save_the_serve
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=sts_production_super_secret_signing_key_minimum_64_characters_long_12345
+      - PROJECT_NAME=Save The Serve (S.T.S) API
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - POSTGIS_SRID=4326
+      - DEFAULT_SEARCH_RADIUS_KM=25.0
+      - MAX_SEARCH_RADIUS_KM=100.0
+    depends_on:
+      postgis:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sts-network
+
+volumes:
+  postgis_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  sts-network:
+    driver: bridge

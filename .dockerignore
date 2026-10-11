@@ -1,0 +1,36 @@
+# Version control
+.git
+.gitignore
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+ENV/
+
+# Environment files
+.env
+.env.local
+
+# Web frontend (Next.js) & Mobile (React Native / Expo)
+frontend/
+mobile/
+node_modules/
+.next/
+.expo/
+
+# System and IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
